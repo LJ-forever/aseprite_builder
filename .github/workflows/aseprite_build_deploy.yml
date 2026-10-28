@@ -116,18 +116,24 @@ jobs:
       - name: Create zip
         working-directory: aseprite/build/bin
         run: 7z -tzip a Aseprite-${{ needs.check-version.outputs.latest_tag }}-Windows.zip *
-      - name: Upload release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
-        with:
-          upload_url: ${{ needs.check-version.outputs.upload_url }}
-          asset_path: aseprite/build/bin/Aseprite-${{ needs.check-version.outputs.latest_tag }}-Windows.zip
-          asset_name: Aseprite-${{ needs.check-version.outputs.latest_tag }}-Windows.zip
-          asset_content_type: application/zip
-      - name: GitHub Release
+      - name: Upload release asset
+        shell: bash
+        run: |
+          curl -sL -X POST "${{ needs.check-version.outputs.upload_url }}?name=Aseprite-${{ needs.check-version.outputs.latest_tag }}-Windows.zip" \
+            -H "Authorization: Bearer ${{ secrets.GH_RELEASE_TOKEN }}" \
+            -H "Content-Type: application/zip" \
+            --data-binary @Aseprite-${{ needs.check-version.outputs.latest_tag }}-Windows.zip
+      - name: Publish Release
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          curl -sL -X PATCH "https://api.github.com/repos/${{ github.repository }}/releases/${{ github.event.release.id }}" \
+            -H "Authorization: Bearer ${{ secrets.GH_RELEASE_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -d '{"draft": false}'
+      - name: GitHub Release (tag push)
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: aseprite/build/bin/Aseprite-${{ needs.check-version.outputs.latest_tag }}-Windows.zip
+          files: Aseprite-${{ needs.check-version.outputs.latest_tag }}-Windows.zip
           tag_name: ${{ needs.check-version.outputs.latest_tag }}
