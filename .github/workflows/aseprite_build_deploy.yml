@@ -55,10 +55,7 @@ jobs:
       id: create_release
       if: steps.should_build.outputs.should_build
       run: |
-        RESPONSE=$(curl -sL -X POST "https://api.github.com/repos/${{ github.repository }}/releases" \
-          -H "Authorization: Bearer ${{ secrets.GH_RELEASE_TOKEN }}" \
-          -H "Accept: application/vnd.github.v3+json" \
-          -d '{
+        RESPONSE=$(curl -sL -X POST "https://api.github.com/repos/${{ github.repository }}/releases"           -H "Authorization: Bearer ${{ secrets.GH_RELEASE_TOKEN }}"           -H "Accept: application/vnd.github.v3+json"           -d '{
             "tag_name": "${{ steps.version_info.outputs.latest_tag }}",
             "name": "Aseprite ${{ steps.version_info.outputs.latest_tag }}",
             "body": "PLACEHOLDER_RELEASE_BODY",
@@ -117,23 +114,14 @@ jobs:
         working-directory: aseprite/build/bin
         run: 7z -tzip a Aseprite-${{ needs.check-version.outputs.latest_tag }}-Windows.zip *
       - name: Upload release asset
+        working-directory: aseprite/build/bin
         shell: bash
         run: |
-          curl -sL -X POST "${{ needs.check-version.outputs.upload_url }}?name=Aseprite-${{ needs.check-version.outputs.latest_tag }}-Windows.zip" \
-            -H "Authorization: Bearer ${{ secrets.GH_RELEASE_TOKEN }}" \
-            -H "Content-Type: application/zip" \
-            --data-binary @Aseprite-${{ needs.check-version.outputs.latest_tag }}-Windows.zip
+          ASSET="Aseprite-${{ needs.check-version.outputs.latest_tag }}-Windows.zip"
+          curl -sL -X POST "${{ needs.check-version.outputs.upload_url }}?name=$(basename "$ASSET")"             -H "Authorization: Bearer ${{ secrets.GH_RELEASE_TOKEN }}"             -H "Content-Type: application/zip"             --data-binary @"$ASSET"
       - name: Publish Release
         if: github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
-          curl -sL -X PATCH "https://api.github.com/repos/${{ github.repository }}/releases/${{ github.event.release.id }}" \
-            -H "Authorization: Bearer ${{ secrets.GH_RELEASE_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            -d '{"draft": false}'
-      - name: GitHub Release (tag push)
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: Aseprite-${{ needs.check-version.outputs.latest_tag }}-Windows.zip
-          tag_name: ${{ needs.check-version.outputs.latest_tag }}
+          RELEASE_ID=$(curl -sL "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ needs.check-version.outputs.latest_tag }}"             -H "Authorization: Bearer ${{ secrets.GH_RELEASE_TOKEN }}"             -H "Accept: application/vnd.github.v3+json" | jq -r '.id')
+          curl -sL -X PATCH "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID"             -H "Authorization: Bearer ${{ secrets.GH_RELEASE_TOKEN }}"             -H "Accept: application/vnd.github.v3+json"             -d '{"draft": false}'
