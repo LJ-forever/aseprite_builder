@@ -1,4 +1,4 @@
-name: Build and deploy Aseprite
+﻿name: Build and deploy Aseprite
 
 on:
   schedule:
@@ -57,7 +57,7 @@ jobs:
       # uses: actions/create-release@v1
       uses: ncipollo/release-action@v1.20.0
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
       with:
         allowUpdates: true
         removeArtifacts: true
@@ -153,7 +153,7 @@ jobs:
       - name: Upload release
         uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
         with:
           upload_url: ${{ needs.check-version.outputs.upload_url }}
           asset_path: aseprite/build/bin/Aseprite-${{ needs.check-version.outputs.latest_tag }}-${{ runner.os }}.zip
