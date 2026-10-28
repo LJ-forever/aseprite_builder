@@ -71,65 +71,38 @@ jobs:
         GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
 
   build-aseprite:
-    name: Build Aseprite
+    name: Build Aseprite (Windows)
     needs: check-version
     if: ${{ needs.check-version.outputs.should_build }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-       matrix:
-         os: [windows-latest, ubuntu-latest, macOS-latest]
-       fail-fast: false
+    runs-on: windows-latest
     steps:
-      - name: (Windows) Install dependencies
-        if: matrix.os == 'windows-latest'
+      - name: Install ninja
         uses: seanmiddleditch/gha-setup-ninja@v3
-      - name: (Windows) Remove OpenSLL from PATH
-        if: matrix.os == 'windows-latest'
+      - name: Remove OpenSSL from PATH
         shell: powershell
         run: Remove-Item -Recurse -Force "C:\Program Files\OpenSSL\"
-      - name: (Ubuntu) Install dependencies
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt update && sudo apt install -y cmake ninja-build libxcursor-dev libxi-dev libgl1-mesa-dev libfontconfig-dev x11-xserver-utils libxrandr-dev
-      - name: (macOS) Install dependencies
-        if: matrix.os == 'macOS-latest'
-        run: brew install ninja p7zip
       - name: Get Skia from cache
         id: skia-cache
         uses: actions/cache@v3
         with:
           path: skia
-          key: skia-${{ matrix.os }}-cache
-      - name: Download Skia if not in cache (linux)
-        if: steps.skia-cache.outputs.cache-hit != 'true' && matrix.os == 'ubuntu-latest'
-        run: |
-          curl -o Skia-${{ runner.os }}-Release-X64.zip -L https://github.com/aseprite/skia/releases/download/m124-08a5439a6b/Skia-${{ runner.os }}-Release-x64.zip
-          unzip Skia-${{ runner.os }}-Release-X64.zip -d skia
+          key: skia-windows-cache
       - name: Download Skia if not in cache
-        if: steps.skia-cache.outputs.cache-hit != 'true' && matrix.os != 'ubuntu-latest'
+        if: steps.skia-cache.outputs.cache-hit != 'true'
         run: |
-          curl -o Skia-${{ runner.os }}-Release-X64.zip -L https://github.com/aseprite/skia/releases/download/m124-08a5439a6b/Skia-${{ runner.os }}-Release-x64.zip
-          unzip Skia-${{ runner.os }}-Release-X64.zip -d skia
-      - name: Download Aseprite release
+          curl -o Skia-Windows-Release-X64.zip -L https://github.com/aseprite/skia/releases/download/m124-08a5439a6b/Skia-Windows-Release-x64.zip
+          unzip Skia-Windows-Release-X64.zip -d skia
+      - name: Download Aseprite source
         run: |
           curl -o Aseprite-source.zip -L ${{ needs.check-version.outputs.download_url }}
           unzip Aseprite-source.zip -d aseprite
           mkdir -p aseprite/build
-      - name: (Windows) Setting Visual Studio build environment variables and paths
-        if: matrix.os == 'windows-latest'
+      - name: Setting Visual Studio build environment
         uses: seanmiddleditch/gha-setup-vsdevenv@v4
-      - name: (Windows) Run CMake
-        if: matrix.os == 'windows-latest'
+      - name: Run CMake
         working-directory: aseprite/build
         shell: pwsh
         run: cmake -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DCMAKE_IGNORE_PATH='C:/ProgramData/chocolatey/bin/;C:/Strawberry/c/bin/' -DLAF_BACKEND=skia -DSKIA_DIR="$(Convert-Path ../../skia)" -DSKIA_LIBRARY_DIR="$(Convert-Path ../../skia/out/Release-x64)" -DSKIA_LIBRARY="$(Convert-Path ../../skia/out/Release-x64/skia.lib)" -G Ninja ..
-      - name: (Ubuntu) Run CMake
-        if: matrix.os == 'ubuntu-latest'
-        working-directory: aseprite/build
-        run: cmake -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DLAF_BACKEND=skia -DSKIA_DIR=$(realpath ../../skia) -DSKIA_LIBRARY_DIR=$(realpath ../../skia/out/Release-x64) -G Ninja ..
-      - name: (macOS) Run CMake
-        if: matrix.os == 'macOS-latest'
-        working-directory: aseprite/build
-        run: cmake -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9 -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -DLAF_BACKEND=skia -DSKIA_DIR=$(realpath ../../skia) -DSKIA_LIBRARY_DIR=$(realpath ../../skia/out/Release-x64) -G Ninja ..
       - name: Run Ninja
         working-directory: aseprite/build
         run: ninja aseprite -j4
@@ -137,24 +110,24 @@ jobs:
         working-directory: aseprite/build/bin
         shell: bash
         run: rm -f gen modp_b64_gen gen.exe gen.exe.manifest modp_b64_gen.exe modp_b64_gen.exe.manifest
-      - name: (Windows) Make portable zip
+      - name: Make portable zip
         working-directory: aseprite/build/bin
         run: echo '# This file is here so Aseprite behaves as a portable program' > aseprite.ini
-      - name: Create release
+      - name: Create zip
         working-directory: aseprite/build/bin
-        run: 7z -tzip a Aseprite-${{ needs.check-version.outputs.latest_tag }}-${{ runner.os }}.zip *
+        run: 7z -tzip a Aseprite-${{ needs.check-version.outputs.latest_tag }}-Windows.zip *
       - name: Upload release
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
         with:
           upload_url: ${{ needs.check-version.outputs.upload_url }}
-          asset_path: aseprite/build/bin/Aseprite-${{ needs.check-version.outputs.latest_tag }}-${{ runner.os }}.zip
-          asset_name: Aseprite-${{ needs.check-version.outputs.latest_tag }}-${{ runner.os }}.zip
+          asset_path: aseprite/build/bin/Aseprite-${{ needs.check-version.outputs.latest_tag }}-Windows.zip
+          asset_name: Aseprite-${{ needs.check-version.outputs.latest_tag }}-Windows.zip
           asset_content_type: application/zip
       - name: GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: aseprite/build/bin/Aseprite-${{ needs.check-version.outputs.latest_tag }}-${{ runner.os }}.zip
+          files: aseprite/build/bin/Aseprite-${{ needs.check-version.outputs.latest_tag }}-Windows.zip
           tag_name: ${{ needs.check-version.outputs.latest_tag }}
